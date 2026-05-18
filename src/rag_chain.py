@@ -144,9 +144,18 @@ GENERAL_INFO_PATTERN = re.compile(r"(주차|주차장|위치|주소|진료시간
 BOTOX_PATTERN = re.compile(r"(보톡스|필러|스킨부스터)")
 
 
+RESERVATION_PATTERN = re.compile(r"(예약|어디서|방법|하나요|어떻게|상담)")
+
 def is_price_query(query: str) -> bool:
-    """가격/견적 문의인지 판정한다."""
-    return bool(PRICE_QUERY_PATTERN.search(query or ""))
+    """가격/견적이 질문의 '주된 의도'일 때만 True를 반환한다.
+    예약 방법, 사진 가능 여부 등 다른 의도가 함께 있으면 GPT가 전체를 처리하도록 False 반환.
+    """
+    if not PRICE_QUERY_PATTERN.search(query or ""):
+        return False
+    # 복합 질문 감지: 예약·방법 등이 함께 있으면 GPT로 전달
+    if RESERVATION_PATTERN.search(query or ""):
+        return False
+    return True
 
 
 def build_price_handoff_answer(query: str) -> str:

@@ -344,7 +344,7 @@ def counselor_link_html(link: str) -> str:
     return (
         '<div class="handoff-card">'
         '이 문의는 상담원이 이어서 확인하면 더 안전합니다.<br>'
-        f'<a href="{safe_link}" target="_blank">상담원 연결 / 상담 요약 보기</a>'
+        f'<a href="{safe_link}" target="_blank">📋 상담 연결 요청하기</a>'
         '</div>'
     )
 
@@ -462,30 +462,50 @@ def render_counselor_page(case_id: str):
             '</div>'
         )
 
+    # ── 고객 노출 영역: 접수 확인 메시지 ──────────────────────
     st.markdown(
         f"""
 <div class="counselor-hero">
-  <h1>👩‍💼 상담원 확인 페이지</h1>
-  <p>케이스 ID: {to_html(case.get('case_id', ''))} · 생성시각: {to_html(case.get('created_at', ''))}</p>
+  <h1>✅ 상담 연결 요청 접수</h1>
+  <p>접수 번호: {to_html(case.get('case_id', '')[:16])} · {to_html(case.get('created_at', '')[:16])}</p>
+</div>
+<div class="section-card">
+  <h2>📋 고객 문의 내용</h2>
+  <div class="question-box">{to_html(analysis.get('원문 질문', ''))}</div>
+</div>
+<div class="section-card" style="background:#f0fff4; border-color:#a8d5b5;">
+  <h2>💬 챗봇 안내 내용</h2>
+  <div class="answer-box">{to_html(analysis.get('챗봇 답변 요약', ''))}</div>
+</div>
+<div class="section-card" style="background:#fff8e1; border-color:#ffe082;">
+  <h2>📞 다음 안내</h2>
+  <div class="answer-box" style="font-size:18px; font-weight:700; color:#3c1e1e;">
+    상담 연결 요청이 접수되었습니다.<br>
+    빠른 시간 내에 상담원이 연락드리겠습니다.<br><br>
+    전화 문의: <b>대표번호로 연락</b>하시거나,<br>
+    카카오톡 채널 / 네이버 예약으로도 상담 예약이 가능합니다.
+  </div>
 </div>
 """,
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        '<div class="summary-grid">'
-        + card("관심 부위", analysis.get("고객 관심 부위", "미확인"))
-        + card("희망 변화", analysis.get("희망 변화", "미확인"))
-        + card("이전 시술", analysis.get("이전 시술", "미확인"))
-        + card("걱정 요소", analysis.get("걱정 요소", "미확인"))
-        + card("희망 일정", analysis.get("희망 일정", "미확인"))
-        + card("긴급도", analysis.get("긴급도", "미확인"), "urgent")
-        + '</div>',
-        unsafe_allow_html=True,
-    )
+    # ── 상담원 전용 내부 데이터 (접어두기) ─────────────────────
+    with st.expander("🔒 상담원 전용 — 내부 분석 데이터 (클릭하여 펼치기)"):
+        st.markdown(
+            '<div class="summary-grid">'
+            + card("관심 부위", analysis.get("고객 관심 부위", "미확인"))
+            + card("희망 변화", analysis.get("희망 변화", "미확인"))
+            + card("이전 시술", analysis.get("이전 시술", "미확인"))
+            + card("걱정 요소", analysis.get("걱정 요소", "미확인"))
+            + card("희망 일정", analysis.get("희망 일정", "미확인"))
+            + card("긴급도", analysis.get("긴급도", "미확인"), "urgent")
+            + '</div>',
+            unsafe_allow_html=True,
+        )
 
-    st.markdown(
-        f"""
+        st.markdown(
+            f"""
 <div class="section-card">
   <h2>상담 연결 사유</h2>
   <div class="summary-card reason" style="box-shadow:none; margin:0;">
@@ -493,53 +513,34 @@ def render_counselor_page(case_id: str):
   </div>
 </div>
 """,
-        unsafe_allow_html=True,
-    )
-
-    actions_html = "".join(f"<li>{to_html(action)}</li>" for action in analysis.get("상담원 확인 포인트", []))
-    st.markdown(
-        f"""
-<div class="section-card">
-  <h2>상담원이 먼저 확인할 것</h2>
-  <ul class="action-list">{actions_html}</ul>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        f"""
-<div class="section-card">
-  <h2>고객 원문 질문</h2>
-  <div class="question-box">{to_html(analysis.get('원문 질문', ''))}</div>
-</div>
-<div class="section-card">
-  <h2>챗봇 답변</h2>
-  <div class="answer-box">{to_html(analysis.get('챗봇 답변 요약', ''))}</div>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-
-    if analysis.get("위험도 메타"):
-        risk_html = ""
-        for item in analysis["위험도 메타"]:
-            risk_html += (
-                '<div class="risk-box">'
-                f'<b>FAQ:</b> {to_html(item.get("question", ""))}<br>'
-                f'<b>위험도:</b> {to_html(item.get("medical_risk_level", "unknown"))}<br>'
-                f'<b>대응:</b> {to_html(item.get("routing_action", ""))}<br>'
-                f'<b>검토 사유:</b> {to_html(item.get("review_reason", ""))}'
-                '</div>'
-            )
-        st.markdown(f'<div class="section-card"><h2>내부 위험도 참고</h2>{risk_html}</div>', unsafe_allow_html=True)
-
-    if analysis.get("참고 FAQ"):
-        faq_html = "".join(f"<li>{to_html(faq)}</li>" for faq in analysis["참고 FAQ"])
-        st.markdown(
-            f'<div class="section-card"><h2>참고 FAQ 후보</h2><ul class="action-list">{faq_html}</ul></div>',
             unsafe_allow_html=True,
         )
+
+        actions_html = "".join(f"<li>{to_html(action)}</li>" for action in analysis.get("상담원 확인 포인트", []))
+        st.markdown(
+            f'<div class="section-card"><h2>상담원이 먼저 확인할 것</h2><ul class="action-list">{actions_html}</ul></div>',
+            unsafe_allow_html=True,
+        )
+
+        if analysis.get("위험도 메타"):
+            risk_html = ""
+            for item in analysis["위험도 메타"]:
+                risk_html += (
+                    '<div class="risk-box">'
+                    f'<b>FAQ:</b> {to_html(item.get("question", ""))}<br>'
+                    f'<b>위험도:</b> {to_html(item.get("medical_risk_level", "unknown"))}<br>'
+                    f'<b>대응:</b> {to_html(item.get("routing_action", ""))}<br>'
+                    f'<b>검토 사유:</b> {to_html(item.get("review_reason", ""))}'
+                    '</div>'
+                )
+            st.markdown(f'<div class="section-card"><h2>내부 위험도 참고</h2>{risk_html}</div>', unsafe_allow_html=True)
+
+        if analysis.get("참고 FAQ"):
+            faq_html = "".join(f"<li>{to_html(faq)}</li>" for faq in analysis["참고 FAQ"])
+            st.markdown(
+                f'<div class="section-card"><h2>참고 FAQ 후보</h2><ul class="action-list">{faq_html}</ul></div>',
+                unsafe_allow_html=True,
+            )
 
     st.markdown(
         '<div class="muted-note">이 페이지는 상담원 보조용 요약입니다. 최종 의료 판단은 의료진 상담을 통해 진행해야 합니다.</div>',
