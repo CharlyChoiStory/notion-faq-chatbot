@@ -1,0 +1,28 @@
+# 환경 변수 (API Key 포함)
+.env
+.env.*
+
+# Python 가상환경
+.venv/
+.venv314/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# ChromaDB 데이터 (로컬 인덱스)
+data/chroma_db/
+data/uploads/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# 빌드 산출물
+dist/
+build/
+*.egg-info/
