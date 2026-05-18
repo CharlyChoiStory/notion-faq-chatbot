@@ -259,6 +259,11 @@ def today_str() -> str:
     return now.strftime(f"%Y년 %m월 %d일 {wd}요일")
 
 
+# ── 병원 배너 이미지 ──────────────────────────────────────
+_banner_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "banner.jpg")
+if os.path.exists(_banner_path):
+    st.image(_banner_path, use_container_width=True)
+
 # ── 병원명 메인 타이틀 ─────────────────────────────────────
 st.markdown("""
 <div class="clinic-title"><span class="accent">AI미인</span> 성형외과</div>
