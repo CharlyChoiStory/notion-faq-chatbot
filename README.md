@@ -25,11 +25,13 @@
 [FAQ-001 구조 자동 파싱 또는 섹션 청킹]
         ↓
 [가벼운 성형외과 업무 온톨로지 자동 태깅]
-  built-in rules + ~/Desktop/plastic_surgery_ontology_sample.md
+  built-in rules + data/uploads/plastic_surgery_ontology_sample.md
         ↓
-[OpenAI Embedding]
+[OpenAI text-embedding-3-small]
         ↓
-[ChromaDB 로컬 벡터 DB]
+[Vector DB]
+  - local: ChromaDB
+  - cloud: Supabase Postgres + pgvector
         ↓
 [사용자 질문]
         ↓
@@ -47,7 +49,7 @@
 - 데이터 소스: 로컬 파일 업로드 (`md`, `txt`, `pdf`, `docx`)
 - 문서 파싱: 자체 `local_loader.py`, `pypdf`, `python-docx`
 - 임베딩: OpenAI `text-embedding-3-small`
-- 벡터 DB: ChromaDB
+- 벡터 DB: ChromaDB 또는 Supabase Postgres + pgvector
 - LLM: OpenAI `gpt-4o-mini`
 - UI: Streamlit
 - 지식 구조화: Lightweight Business Ontology
@@ -64,7 +66,7 @@ notion-faq-chatbot/
 ├── src/
 │   ├── local_loader.py        # 로컬 md/txt/pdf/docx 추출 및 FAQ 파싱
 │   ├── ontology.py            # 성형외과 업무 온톨로지 자동 태깅
-│   ├── embeddings.py          # 임베딩 & ChromaDB 저장/검색
+│   ├── embeddings.py          # 임베딩 & ChromaDB/Supabase Vector DB 저장/검색
 │   ├── rag_chain.py           # RAG 검색 → 프롬프트 → ChatGPT 답변
 │   ├── app.py                 # Streamlit 챗봇 UI
 │   └── notion_loader.py       # 이전 Notion 연동 파일, 현재 데모에서는 미사용

@@ -203,11 +203,15 @@ PERIOD_RULES: tuple[str, ...] = (
     "당일", "24시간", "1일", "2일", "3일", "5일", "7일", "일주일", "10일", "14일", "2주", "30일", "한 달", "1개월", "3개월", "6개월", "90일"
 )
 
-_repo_root = Path(__file__).resolve().parents[1]
-DEFAULT_ONTOLOGY_MD_PATH = Path(os.getenv(
-    "PLASTIC_SURGERY_ONTOLOGY_PATH",
-    str(_repo_root / "samples" / "2.plastic_surgery_ontology_sample.md"),
-))
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_ONTOLOGY_MD_PATHS = [
+    Path(os.getenv("PLASTIC_SURGERY_ONTOLOGY_PATH", "")).expanduser() if os.getenv("PLASTIC_SURGERY_ONTOLOGY_PATH") else None,
+    PROJECT_ROOT / "data" / "uploads" / "plastic_surgery_ontology_sample.md",
+    Path.home() / "Desktop" / "plastic_surgery_ontology_sample.md",
+    Path.home() / "Desktop" / "Working" / "2.plastic_surgery_ontology_sample.md",
+    Path.home() / "Downloads" / "Telegram Desktop" / "2.plastic_surgery_ontology_sample.md",
+]
+DEFAULT_ONTOLOGY_MD_PATH = next((p for p in DEFAULT_ONTOLOGY_MD_PATHS if p and p.exists()), PROJECT_ROOT / "data" / "uploads" / "plastic_surgery_ontology_sample.md")
 EXTERNAL_ONTOLOGY: dict[str, Any] = {}
 ROUTING_RULES: list[dict[str, Any]] = []
 ANSWER_POLICIES: dict[str, list[str]] = {"must_do": [], "must_not_do": []}
@@ -312,27 +316,18 @@ def _normalize_text(text: str) -> str:
     """한국어 구어체 증상 표현을 온톨로지 키워드와 비교하기 쉽게 정규화한다."""
     normalized = text.lower()
     replacements = {
-        "숨쉬기가 힘들": "숨쉬기 힘듦 호흡곤란",
         "숨쉬기 힘들어요": "숨쉬기 힘듦 호흡곤란",
         "숨쉬기 힘들어": "숨쉬기 힘듦 호흡곤란",
         "숨 쉬기 힘들": "숨쉬기 힘듦 호흡곤란",
         "숨쉬기 힘들": "숨쉬기 힘듦 호흡곤란",
         "숨이 차": "호흡곤란",
         "숨이 안": "호흡곤란",
-        "답답해요": "호흡곤란 숨쉬기 힘듦",
-        "답답해": "호흡곤란 숨쉬기 힘듦",
         "피가 계속 나": "피가 계속 남 지속 출혈",
         "피가 멈추지": "코피가 멈추지 않음 지속 출혈",
-        "앞이 흐릿": "앞이 흐림 시야 이상",
         "앞이 흐려": "앞이 흐림 시야 이상",
         "잘 안 보여": "잘 안 보임 시야 이상",
-        "잘 안 보임": "시야 이상",
         "하얗게 변했": "하얗게 변함 피부색 변화",
         "검게 변했": "검게 변함 피부색 변화",
-        "진료시간": "진료시간 영업시간 운영시간",
-        "진료 시간": "진료시간 영업시간 운영시간",
-        "예약금": "예약금 환불 취소",
-        "환불": "환불 취소 예약금",
     }
     for old, new in replacements.items():
         normalized = normalized.replace(old, new)
@@ -405,9 +400,6 @@ def _condition_matches(text: str, condition: dict[str, Any]) -> bool:
     if question_type:
         qtype_key = _slug(question_type)
         rule = TERMS.get(qtype_key)
-        # 예약문의 규칙은 환불/취소 키워드가 없을 때만 매칭 (예약금 환불 오분류 방지)
-        if question_type == "예약문의" and _contains_any(text, ("환불", "취소", "예약금", "노쇼")):
-            return False
         words = rule.synonyms if rule else (question_type,)
         if not _contains_any(text, words):
             return False

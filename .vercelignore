@@ -1,0 +1,15 @@
+# Vercel에는 정적 랜딩 페이지(public/)만 배포합니다.
+# Streamlit 앱 소스는 GitHub에는 보존하되 Vercel 빌드 감지에서 제외합니다.
+src/
+tests/
+data/
+docs/
+*.md
+requirements.txt
+AGENTS.md
+CLAUDE.md
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/

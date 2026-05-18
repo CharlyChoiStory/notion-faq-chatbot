@@ -21,7 +21,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from local_loader import load_faq_from_files
 from embeddings import build_index, search_faq
 
-SAMPLE = Path.home() / "Desktop" / "plastic_surgery_faq_knowledge_base.md"
+SAMPLE_CANDIDATES = [
+    Path.home() / "Desktop" / "plastic_surgery_faq_knowledge_base.md",
+    Path(__file__).resolve().parents[1] / "data" / "uploads" / "plastic_surgery_faq_knowledge_base.md",
+]
+SAMPLE = next((path for path in SAMPLE_CANDIDATES if path.exists()), SAMPLE_CANDIDATES[0])
 
 
 def test_build_index_and_search_with_local_sample():

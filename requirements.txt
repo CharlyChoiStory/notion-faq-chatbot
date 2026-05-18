@@ -14,11 +14,12 @@ python-docx>=1.1.2
 # 환경 변수
 python-dotenv>=1.0.1
 
-# 유틸리티 — pre-built wheels only (no source build)
+# 유틸리티
 tqdm>=4.66.0
 pandas>=2.2.0
 
 # 선택 사항: OPENAI_API_KEY가 없을 때 로컬 임베딩 fallback용
 sentence-transformers>=3.0.1
 
-# cache-bust: 2026-05-18
+# 선택: Supabase Postgres + pgvector 백엔드
+# psycopg[binary]>=3.2.3

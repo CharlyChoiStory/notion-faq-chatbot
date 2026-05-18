@@ -14,40 +14,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import streamlit as st
 from rag_chain import generate_answer
 from local_loader import save_uploaded_file, load_faq_from_files
+from counselor import create_counselor_case, load_counselor_case
 from datetime import datetime
-
-# ── Streamlit Cloud Secrets → 환경변수 자동 주입 ─────────────
-try:
-    for _k, _v in st.secrets.items():
-        if _k not in os.environ:
-            os.environ[_k] = str(_v)
-except Exception:
-    pass
-
-# ── 서버 시작 시 샘플 FAQ 자동 인덱싱 (ChromaDB가 비어 있을 때) ──
-@st.cache_resource(show_spinner="FAQ 지식베이스 초기 구축 중...")
-def _auto_index_samples():
-    """배포 환경에서 ChromaDB가 비어 있으면 samples/ 폴더로 자동 인덱싱한다."""
-    try:
-        from embeddings import get_chroma_collection, build_index
-        collection = get_chroma_collection()
-        if collection.count() > 0:
-            return collection.count()
-        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        sample_files = [
-            os.path.join(base, "samples", "1.sample-faq-db.md"),
-            os.path.join(base, "samples", "3.plastic_surgery_harness_build_data.md"),
-        ]
-        existing = [f for f in sample_files if os.path.exists(f)]
-        if not existing:
-            return 0
-        faq_list = load_faq_from_files(existing)
-        build_index(faq_list, reset=False)
-        return len(faq_list)
-    except Exception:
-        return 0
-
-_auto_index_samples()
+from html import escape
 
 # ── 페이지 설정 ───────────────────────────────────────────
 st.set_page_config(
@@ -190,6 +159,28 @@ st.markdown("""
         white-space: nowrap;
     }
 
+    /* 상담원 연결 링크 */
+    .handoff-card {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background-color: #fff7cc;
+        border: 1px solid #f0d450;
+        color: #1a1a1a;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+    .handoff-card a {
+        display: inline-block;
+        margin-top: 6px;
+        padding: 7px 10px;
+        border-radius: 8px;
+        background-color: #3c1e1e;
+        color: #ffffff !important;
+        text-decoration: none;
+        font-weight: 800;
+    }
+
     /* 출처/정책 메타 박스 */
     .source-tag {
         background-color: #f0f4f7;
@@ -210,13 +201,37 @@ st.markdown("""
         margin-top: 6px;
     }
 
-    /* 입력창 커스텀 */
-    .stChatInput {
+    /* 입력창 커스텀 — 터널/모바일에서도 클릭 가능하도록 최상위 레이어 보장 */
+    .stChatInput,
+    [data-testid="stChatInput"],
+    [data-testid="stChatInput"] > div {
         background-color: #f0f2f5 !important;
         border-radius: 24px !important;
+        position: relative !important;
+        z-index: 9999 !important;
+        pointer-events: auto !important;
     }
-    .stChatInput textarea {
-        background-color: #f0f2f5 !important;
+    .stChatInput textarea,
+    [data-testid="stChatInput"] textarea,
+    textarea[aria-label="Chat input"] {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+        caret-color: #1a1a1a !important;
+        pointer-events: auto !important;
+        user-select: text !important;
+        -webkit-user-select: text !important;
+        opacity: 1 !important;
+        min-height: 44px !important;
+        font-size: 16px !important;
+    }
+    [data-testid="stChatInput"] button {
+        pointer-events: auto !important;
+        z-index: 10000 !important;
+    }
+    /* 커스텀 말풍선이 입력창 위를 덮지 않도록 안전장치 */
+    .bot-row, .user-row, .bot-bubble, .user-bubble {
+        position: relative;
+        z-index: 1;
     }
 
     /* 사이드바 스타일 */
@@ -292,10 +307,253 @@ def today_str() -> str:
     return now.strftime(f"%Y년 %m월 %d일 {wd}요일")
 
 
-# ── 병원 배너 이미지 ──────────────────────────────────────
-_banner_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "banner.jpg")
-if os.path.exists(_banner_path):
-    st.image(_banner_path, use_container_width=True)
+def to_html(text: str) -> str:
+    """사용자/LLM 텍스트를 안전하게 HTML 말풍선 안에 넣는다."""
+    return escape(text or "").replace("\n", "<br>")
+
+
+def render_user_message_html(content: str, time_str: str) -> str:
+    """사용자 말풍선 HTML. Streamlit Markdown 오인 방지를 위해 들여쓰기 없는 단일 구조로 만든다."""
+    return (
+        '<div class="user-row">'
+        f'<div class="msg-time">{to_html(time_str)}</div>'
+        f'<div class="user-bubble">{to_html(content)}</div>'
+        '</div>'
+    )
+
+
+def render_bot_message_html(content: str, time_str: str, counselor_link: str = "") -> str:
+    """봇 말풍선 HTML. 닫는 div가 텍스트로 새지 않도록 들여쓰기/개행을 최소화한다."""
+    return (
+        '<div class="bot-row">'
+        '<div class="bot-avatar">🤖</div>'
+        '<div>'
+        '<div class="bot-name">성형외과 FAQ 도우미</div>'
+        f'<div class="bot-bubble">{to_html(content)}{counselor_link_html(counselor_link)}</div>'
+        '</div>'
+        f'<div class="msg-time">{to_html(time_str)}</div>'
+        '</div>'
+    )
+
+
+def counselor_link_html(link: str) -> str:
+    if not link:
+        return ""
+    safe_link = escape(link, quote=True)
+    # 주의: 앞쪽 공백/들여쓰기가 있으면 Streamlit Markdown이 코드블록으로 렌더링할 수 있다.
+    return (
+        '<div class="handoff-card">'
+        '이 문의는 상담원이 이어서 확인하면 더 안전합니다.<br>'
+        f'<a href="{safe_link}" target="_blank">상담원 연결 / 상담 요약 보기</a>'
+        '</div>'
+    )
+
+
+def render_counselor_page(case_id: str):
+    case = load_counselor_case(case_id)
+    if not case:
+        st.error("상담 케이스를 찾을 수 없습니다. 링크가 잘못되었거나 케이스 파일이 삭제되었을 수 있습니다.")
+        st.stop()
+
+    analysis = case.get("analysis", {})
+
+    st.markdown("""
+<style>
+    .stApp { background: #eef4f8 !important; }
+    .block-container { max-width: 1180px !important; padding-top: 2.2rem !important; }
+    .counselor-hero {
+        background: linear-gradient(135deg, #2d3e50 0%, #506b86 100%);
+        color: white;
+        padding: 24px 28px;
+        border-radius: 22px;
+        box-shadow: 0 12px 28px rgba(31, 45, 61, 0.18);
+        margin-bottom: 22px;
+    }
+    .counselor-hero h1 { margin: 0 0 8px 0; font-size: 34px; line-height: 1.2; }
+    .counselor-hero p { margin: 0; opacity: 0.88; font-size: 15px; }
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin: 16px 0 22px 0;
+    }
+    .summary-card {
+        background: #ffffff;
+        border: 1px solid #d8e3ec;
+        border-radius: 16px;
+        padding: 16px 18px;
+        box-shadow: 0 4px 14px rgba(31, 45, 61, 0.08);
+        min-height: 92px;
+    }
+    .summary-label {
+        color: #687789;
+        font-size: 13px;
+        font-weight: 800;
+        margin-bottom: 7px;
+    }
+    .summary-value {
+        color: #17212b;
+        font-size: 22px;
+        line-height: 1.35;
+        font-weight: 900;
+        word-break: keep-all;
+    }
+    .summary-card.urgent { border-left: 7px solid #e74c3c; }
+    .summary-card.reason { border-left: 7px solid #f1c40f; }
+    .section-card {
+        background: #ffffff;
+        border: 1px solid #d8e3ec;
+        border-radius: 18px;
+        padding: 20px 22px;
+        margin: 16px 0;
+        box-shadow: 0 4px 14px rgba(31, 45, 61, 0.08);
+    }
+    .section-card h2 { margin: 0 0 14px 0; font-size: 24px; color: #17212b; }
+    .question-box {
+        background: #e8f2ff;
+        border-left: 7px solid #3498db;
+        color: #102033;
+        font-size: 20px;
+        font-weight: 800;
+        line-height: 1.55;
+        padding: 18px 20px;
+        border-radius: 14px;
+    }
+    .answer-box {
+        background: #f8fafc;
+        border-left: 7px solid #95a5a6;
+        color: #1f2d3d;
+        font-size: 17px;
+        line-height: 1.75;
+        padding: 16px 18px;
+        border-radius: 14px;
+    }
+    .action-list li {
+        font-size: 18px;
+        line-height: 1.75;
+        margin-bottom: 8px;
+        color: #17212b;
+        font-weight: 650;
+    }
+    .risk-box {
+        background: #fff7e6;
+        border-left: 7px solid #f39c12;
+        color: #3c2a00;
+        padding: 14px 16px;
+        border-radius: 14px;
+        margin: 10px 0;
+        font-size: 16px;
+        line-height: 1.65;
+    }
+    .muted-note { color: #6b7886; font-size: 13px; margin-top: 18px; }
+    @media (max-width: 850px) {
+        .summary-grid { grid-template-columns: 1fr; }
+        .counselor-hero h1 { font-size: 28px; }
+        .summary-value { font-size: 20px; }
+    }
+</style>
+""", unsafe_allow_html=True)
+
+    def card(label: str, value: str, extra_class: str = "") -> str:
+        return (
+            f'<div class="summary-card {extra_class}">'
+            f'<div class="summary-label">{to_html(label)}</div>'
+            f'<div class="summary-value">{to_html(value or "미확인")}</div>'
+            '</div>'
+        )
+
+    st.markdown(
+        f"""
+<div class="counselor-hero">
+  <h1>👩‍💼 상담원 확인 페이지</h1>
+  <p>케이스 ID: {to_html(case.get('case_id', ''))} · 생성시각: {to_html(case.get('created_at', ''))}</p>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="summary-grid">'
+        + card("관심 부위", analysis.get("고객 관심 부위", "미확인"))
+        + card("희망 변화", analysis.get("희망 변화", "미확인"))
+        + card("이전 시술", analysis.get("이전 시술", "미확인"))
+        + card("걱정 요소", analysis.get("걱정 요소", "미확인"))
+        + card("희망 일정", analysis.get("희망 일정", "미확인"))
+        + card("긴급도", analysis.get("긴급도", "미확인"), "urgent")
+        + '</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"""
+<div class="section-card">
+  <h2>상담 연결 사유</h2>
+  <div class="summary-card reason" style="box-shadow:none; margin:0;">
+    <div class="summary-value">{to_html(analysis.get('상담 연결 사유', '미확인'))}</div>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    actions_html = "".join(f"<li>{to_html(action)}</li>" for action in analysis.get("상담원 확인 포인트", []))
+    st.markdown(
+        f"""
+<div class="section-card">
+  <h2>상담원이 먼저 확인할 것</h2>
+  <ul class="action-list">{actions_html}</ul>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"""
+<div class="section-card">
+  <h2>고객 원문 질문</h2>
+  <div class="question-box">{to_html(analysis.get('원문 질문', ''))}</div>
+</div>
+<div class="section-card">
+  <h2>챗봇 답변</h2>
+  <div class="answer-box">{to_html(analysis.get('챗봇 답변 요약', ''))}</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    if analysis.get("위험도 메타"):
+        risk_html = ""
+        for item in analysis["위험도 메타"]:
+            risk_html += (
+                '<div class="risk-box">'
+                f'<b>FAQ:</b> {to_html(item.get("question", ""))}<br>'
+                f'<b>위험도:</b> {to_html(item.get("medical_risk_level", "unknown"))}<br>'
+                f'<b>대응:</b> {to_html(item.get("routing_action", ""))}<br>'
+                f'<b>검토 사유:</b> {to_html(item.get("review_reason", ""))}'
+                '</div>'
+            )
+        st.markdown(f'<div class="section-card"><h2>내부 위험도 참고</h2>{risk_html}</div>', unsafe_allow_html=True)
+
+    if analysis.get("참고 FAQ"):
+        faq_html = "".join(f"<li>{to_html(faq)}</li>" for faq in analysis["참고 FAQ"])
+        st.markdown(
+            f'<div class="section-card"><h2>참고 FAQ 후보</h2><ul class="action-list">{faq_html}</ul></div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        '<div class="muted-note">이 페이지는 상담원 보조용 요약입니다. 최종 의료 판단은 의료진 상담을 통해 진행해야 합니다.</div>',
+        unsafe_allow_html=True,
+    )
+    st.stop()
+
+
+
+# ── 상담원 전용 페이지 라우팅 ───────────────────────────────
+case_id_param = st.query_params.get("counselor_case")
+if case_id_param:
+    render_counselor_page(case_id_param)
+
 
 # ── 병원명 메인 타이틀 ─────────────────────────────────────
 st.markdown("""
@@ -400,26 +658,13 @@ for msg in st.session_state.messages:
     time_str = msg.get("time", "")
 
     if msg["role"] == "user":
-        st.markdown(f"""
-<div class="user-row">
-    <div class="msg-time">{time_str}</div>
-    <div class="user-bubble">{msg["content"]}</div>
-</div>
-""", unsafe_allow_html=True)
+        st.markdown(render_user_message_html(msg["content"], time_str), unsafe_allow_html=True)
 
     else:
-        st.markdown(f"""
-<div class="bot-row">
-    <div class="bot-avatar">🤖</div>
-    <div>
-        <div class="bot-name">성형외과 FAQ 도우미</div>
-        <div class="bot-bubble">
-            {msg["content"]}
-        </div>
-    </div>
-    <div class="msg-time">{time_str}</div>
-</div>
-""", unsafe_allow_html=True)
+        st.markdown(
+            render_bot_message_html(msg["content"], time_str, msg.get("counselor_link", "")),
+            unsafe_allow_html=True,
+        )
 
 
 # ── 사용자 입력 ───────────────────────────────────────────
@@ -427,12 +672,7 @@ if user_input := st.chat_input("메시지를 입력하세요..."):
     time_str = now_time()
 
     # 유저 말풍선 바로 표시
-    st.markdown(f"""
-<div class="user-row">
-    <div class="msg-time">{time_str}</div>
-    <div class="user-bubble">{user_input}</div>
-</div>
-""", unsafe_allow_html=True)
+    st.markdown(render_user_message_html(user_input, time_str), unsafe_allow_html=True)
 
     st.session_state.messages.append({
         "role": "user",
@@ -450,26 +690,25 @@ if user_input := st.chat_input("메시지를 입력하세요..."):
             answer = result["answer"]
             sources = result["sources"]
             bot_time = now_time()
+            counselor_link = ""
+            if result.get("needs_handoff"):
+                case = create_counselor_case(
+                    question=user_input,
+                    answer=answer,
+                    sources=sources,
+                    chat_history=st.session_state.chat_history,
+                )
+                counselor_link = f"?counselor_case={case['case_id']}"
 
             # 봇 말풍선 표시
-            st.markdown(f"""
-<div class="bot-row">
-    <div class="bot-avatar">🤖</div>
-    <div>
-        <div class="bot-name">성형외과 FAQ 도우미</div>
-        <div class="bot-bubble">
-            {answer}
-        </div>
-    </div>
-    <div class="msg-time">{bot_time}</div>
-</div>
-""", unsafe_allow_html=True)
+            st.markdown(render_bot_message_html(answer, bot_time, counselor_link), unsafe_allow_html=True)
 
             # 세션 저장
             st.session_state.messages.append({
                 "role": "assistant",
                 "content": answer,
                 "sources": sources,
+                "counselor_link": counselor_link,
                 "time": bot_time,
             })
             st.session_state.chat_history.append({"role": "user", "content": user_input})

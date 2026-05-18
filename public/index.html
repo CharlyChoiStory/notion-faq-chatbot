@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI미인 성형외과 FAQ RAG 챗봇</title>
+  <style>
+    :root {
+      --bg: #f7f1e8;
+      --card: #fffaf2;
+      --text: #1f2d3d;
+      --muted: #657487;
+      --accent: #b7791f;
+      --accent2: #ffe812;
+      --border: rgba(31,45,61,.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      background: radial-gradient(circle at top, #fff8dc 0, var(--bg) 42%, #eadcc8 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 18px;
+    }
+    .wrap {
+      width: min(980px, 100%);
+      background: rgba(255,250,242,.92);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      box-shadow: 0 24px 80px rgba(92,62,28,.18);
+      padding: clamp(28px, 5vw, 56px);
+    }
+    .badge {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #fff3bf;
+      color: #6b4f00;
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(38px, 7vw, 72px);
+      line-height: 1.04;
+      letter-spacing: -3px;
+      text-align: center;
+    }
+    h1 .accent { color: var(--accent); }
+    .subtitle {
+      margin: 22px auto 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: clamp(17px, 2.3vw, 23px);
+      line-height: 1.65;
+      text-align: center;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 36px;
+    }
+    .card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 22px;
+      min-height: 150px;
+    }
+    .card h3 { margin: 0 0 10px; font-size: 19px; }
+    .card p { margin: 0; color: var(--muted); line-height: 1.55; }
+    .actions {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 34px;
+    }
+    a.button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 50px;
+      padding: 0 22px;
+      border-radius: 14px;
+      text-decoration: none;
+      font-weight: 800;
+      border: 1px solid var(--border);
+    }
+    .primary { background: var(--accent2); color: #1a1a1a; }
+    .secondary { background: white; color: var(--text); }
+    .note {
+      margin-top: 28px;
+      padding: 18px 20px;
+      border-radius: 18px;
+      background: #fff6e5;
+      color: #694a1a;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    code {
+      background: rgba(0,0,0,.06);
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+      h1 { letter-spacing: -2px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div style="text-align:center"><span class="badge">🏥 RAG FAQ Demo</span></div>
+    <h1><span class="accent">AI미인</span> 성형외과</h1>
+    <p class="subtitle">
+      로컬 FAQ 문서를 업로드하면 자동으로 파싱, 성형외과 온톨로지 태깅, 벡터 검색을 수행하는
+      교육용 RAG 챗봇 프로젝트입니다.
+    </p>
+
+    <section class="grid" aria-label="features">
+      <div class="card">
+        <h3>📄 문서 기반 RAG</h3>
+        <p>md, txt, pdf, docx FAQ 문서를 파싱해 질문/답변 지식베이스를 구축합니다.</p>
+      </div>
+      <div class="card">
+        <h3>🧠 성형외과 온톨로지</h3>
+        <p>위험도, 라우팅, 권장/금지 응답 정책을 메타데이터로 태깅합니다.</p>
+      </div>
+      <div class="card">
+        <h3>☁️ Vector DB 선택</h3>
+        <p>로컬 ChromaDB와 Supabase pgvector 백엔드를 선택할 수 있습니다.</p>
+      </div>
+    </section>
+
+    <div class="actions">
+      <a class="button primary" href="https://shortcuts-salaries-expansys-considers.trycloudflare.com" target="_blank" rel="noopener">챗봇 바로가기</a>
+      <a class="button secondary" href="https://github.com/CharlyChoiStory/rag-faq" target="_blank" rel="noopener">프로젝트 정보</a>
+    </div>
+
+    <div class="note">
+      <strong>사용 안내:</strong> 위 <strong>챗봇 바로가기</strong> 버튼을 누르면 실제 AI미인 성형외과 FAQ 챗봇으로 이동합니다.
+      이 공개 테스트 URL은 현재 찰리님의 로컬 Streamlit 서버를 터널로 연결한 주소라서, 노트북과 터널 프로세스가 켜져 있을 때 접속됩니다.
+    </div>
+  </main>
+</body>
+</html>
