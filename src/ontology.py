@@ -203,9 +203,10 @@ PERIOD_RULES: tuple[str, ...] = (
     "당일", "24시간", "1일", "2일", "3일", "5일", "7일", "일주일", "10일", "14일", "2주", "30일", "한 달", "1개월", "3개월", "6개월", "90일"
 )
 
+_repo_root = Path(__file__).resolve().parents[1]
 DEFAULT_ONTOLOGY_MD_PATH = Path(os.getenv(
     "PLASTIC_SURGERY_ONTOLOGY_PATH",
-    str(Path.home() / "Desktop" / "plastic_surgery_ontology_sample.md"),
+    str(_repo_root / "samples" / "2.plastic_surgery_ontology_sample.md"),
 ))
 EXTERNAL_ONTOLOGY: dict[str, Any] = {}
 ROUTING_RULES: list[dict[str, Any]] = []

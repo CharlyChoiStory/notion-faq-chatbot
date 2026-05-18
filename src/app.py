@@ -16,6 +16,39 @@ from rag_chain import generate_answer
 from local_loader import save_uploaded_file, load_faq_from_files
 from datetime import datetime
 
+# ── Streamlit Cloud Secrets → 환경변수 자동 주입 ─────────────
+try:
+    for _k, _v in st.secrets.items():
+        if _k not in os.environ:
+            os.environ[_k] = str(_v)
+except Exception:
+    pass
+
+# ── 서버 시작 시 샘플 FAQ 자동 인덱싱 (ChromaDB가 비어 있을 때) ──
+@st.cache_resource(show_spinner="FAQ 지식베이스 초기 구축 중...")
+def _auto_index_samples():
+    """배포 환경에서 ChromaDB가 비어 있으면 samples/ 폴더로 자동 인덱싱한다."""
+    try:
+        from embeddings import get_chroma_collection, build_index
+        collection = get_chroma_collection()
+        if collection.count() > 0:
+            return collection.count()
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        sample_files = [
+            os.path.join(base, "samples", "1.sample-faq-db.md"),
+            os.path.join(base, "samples", "3.plastic_surgery_harness_build_data.md"),
+        ]
+        existing = [f for f in sample_files if os.path.exists(f)]
+        if not existing:
+            return 0
+        faq_list = load_faq_from_files(existing)
+        build_index(faq_list, reset=False)
+        return len(faq_list)
+    except Exception:
+        return 0
+
+_auto_index_samples()
+
 # ── 페이지 설정 ───────────────────────────────────────────
 st.set_page_config(
     page_title="성형외과 FAQ 챗봇",
